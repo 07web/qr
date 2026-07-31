@@ -1,16 +1,4 @@
 // Sender: turn a file into an endless fountain-coded QR stream.
-//
-// Tuning notes from the experiments this PoC is distilled from:
-// - Frame payload sets the QR version; denser wins on goodput as long as the
-//   receiver can still decode it. 1465 bytes ≈ V27 is a safe middle ground
-//   for arbitrary monitors; 2953 (V40) is the ceiling and works phone-to-
-//   phone at close range.
-// - The mask pattern is pinned (any declared mask is valid to a decoder);
-//   this skips the spec's 8-way mask evaluation and speeds generation ~4×.
-// - Displays need each frame shown for ≥2 refresh cycles or captures catch
-//   the transition; 24 fps on a 60 Hz screen is comfortable.
-// - Error correction stays at L by default: the fountain layer already
-//   handles erasures, and a frame is either decoded whole or discarded.
 
 import QRCode from "qrcode";
 import { LTEncoder } from "../shared/fountain";
@@ -26,6 +14,7 @@ const cfgFps = document.getElementById("cfg-fps") as HTMLSelectElement;
 const cfgBytes = document.getElementById("cfg-bytes") as HTMLSelectElement;
 const cfgEcc = document.getElementById("cfg-ecc") as HTMLSelectElement;
 const cfgSize = document.getElementById("cfg-size") as HTMLInputElement;
+const cfgCustomFile = document.getElementById("cfg-custom-file") as HTMLInputElement;
 
 const payloadCache = new Map<string, Uint8Array>();
 let generation = 0; // bumped on every restart; stale loops see it and die
@@ -41,6 +30,25 @@ async function loadPayload(url: string): Promise<Uint8Array | null> {
 }
 
 async function main() {
+  cfgCustomFile?.addEventListener("change", async () => {
+    const file = cfgCustomFile.files?.[0];
+    if (!file) return;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const customKey = `custom:${file.name}`;
+
+    payloadCache.set(customKey, bytes);
+
+    const opt = document.createElement("option");
+    opt.value = customKey;
+    opt.textContent = `📄 ${file.name} (${Math.round(file.size / 1024)} KB)`;
+    opt.selected = true;
+    cfgPayload.appendChild(opt);
+
+    void startStream();
+  });
+
   for (const el of [cfgPayload, cfgFps, cfgBytes, cfgEcc, cfgSize]) {
     el.addEventListener("change", () => void startStream());
   }
@@ -135,7 +143,6 @@ async function startStream() {
     try {
       while (queue.length < LOOKAHEAD) queue.push(makeFrame());
     } catch (err) {
-      // e.g. frame bytes over capacity for the chosen ECC level
       specs.textContent = `✗ ${err instanceof Error ? err.message : String(err)}`;
       return;
     }
@@ -159,7 +166,7 @@ async function startStream() {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(staging, 0, 0, canvas.width, canvas.height);
     nextAt += interval;
-    if (now - nextAt > 3 * interval) nextAt = now + interval; // fell behind — don't burst
+    if (now - nextAt > 3 * interval) nextAt = now + interval;
   };
   requestAnimationFrame(tick);
 }
