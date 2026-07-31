@@ -9,9 +9,13 @@
   <body>
     <h1>DECIMEN <small>— Fountain QR File Transfer</small></h1>
     <div class="hint" id="specs">loading payload…</div>
-    <details class="settings">
+    <details class="settings" open>
       <summary>Settings</summary>
       <div class="row">
+        <label>
+          upload custom file
+          <input type="file" id="cfg-custom-file" style="max-width: 180px;" />
+        </label>
         <label>
           payload
           <select id="cfg-payload">
@@ -56,8 +60,7 @@
         </label>
       </div>
       <div class="hint" style="text-align: left; padding-top: 8px">
-        Changes restart the stream — the receiver resets automatically (new
-        session id in the frame headers; that's the fountain protocol's gift).
+        Changes restart the stream — the receiver resets automatically.
       </div>
     </details>
     <div class="stage"><canvas id="qr" width="16" height="16"></canvas></div>
